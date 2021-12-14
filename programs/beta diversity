@@ -1,0 +1,51 @@
+# 2. Beta diversity: Bray-Curtis dissimilarity
+
+*P-value is obtained by Permutational Multivariate Analysis of Variance (PERMANOVA).*
+
+*PERMANOVA is used to compare groups of objects and test the null hypothesis that the centroids and dispersion of the groups as defined by measure space are equivalent for all groups.* 
+
+*A rejection of the null hypothesis means that either the centroid and/or the spread of the objects is different between the groups.*
+
+*When collapsing features to the family-level, its taxonomies will not present in the tree. Therefore, we are not able to construct phylogeny-based beta diversities such as UniFrac, but in this case, Bray-Curtis and UniFrac would likely yield pretty similar results.*
+
+## 2.1 Beta diversity ~ group
+
+### 2.11 NC: Visit 1 vs. Visit 2
+
+```{r}
+set.seed(123)
+# PERMANOVA
+permanova = adonis(t(abundances(nc_family)) ~ visit + age, 
+                   data = meta(nc_family), 
+                   permutations = 999, method = "bray")$aov.tab
+# PERMDISP
+dis = vegdist(t(abundances(nc_family)), method = "bray")
+groups = meta(nc_family)$visit
+groups = recode(groups, `v1` = "Visit 1", `v2` = "Visit 2")
+mod1 = betadisper(d = dis, group = groups, type = "median")
+lab1 = paste0("PCoA", 1:2, " (", signif(100 * mod1$eig / sum(mod1$eig), 3), "%)")
+p1_1 = signif(permanova$`Pr(>F)`[1], 2)
+p2_1 = signif(permutest(mod1)$tab$`Pr(>F)`[1], 2)
+```
+
+### 2.12 SC: Visit 1 vs. Visit 2
+
+```{r}
+set.seed(123)
+# PERMANOVA
+permanova = adonis(t(abundances(sc_family)) ~ visit + age, 
+                   data = meta(sc_family), 
+                   permutations = 999, method = "bray")$aov.tab
+# PERMDISP
+dis = vegdist(t(abundances(sc_family)), method = "bray")
+groups = meta(sc_family)$visit
+groups = recode(groups, `v1` = "Visit 1", `v2` = "Visit 2")
+mod2 = betadisper(d = dis, group = groups, type = "median")
+lab2 = paste0("PCoA", 1:2, " (", signif(100 * mod2$eig / sum(mod2$eig), 3), "%)")
+p1_2 = signif(permanova$`Pr(>F)`[1], 2)
+p2_2 = signif(permutest(mod2)$tab$`Pr(>F)`[1], 2)
+```
+        legend.position = "bottom",
+        axis.text.x = element_blank(),
+        plot.title = element_text(hjust = 0.5))
+p

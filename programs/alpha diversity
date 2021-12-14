@@ -1,0 +1,57 @@
+# 1. Alpha diversities
+
+## 1.1 Alpha diversity ~ group
+
+1. Observed species: richness measure, which returns observed richness.
+
+2. Shannon index: diversity measure, which takes into account richness, divergence and evenness.
+
+3. P-value is obtained by ANCOVA test adjusting for age.
+
+```{r}
+d_alpha = alpha(family_rarefied, index = c("observed", "diversity_shannon"))
+df_alpha = data.frame(sampleid = meta(family_rarefied)$sampleid,
+                      subjid = meta(family_rarefied)$subjid,
+                      status = meta(family_rarefied)$status,
+                      visit = meta(family_rarefied)$visit,
+                      visit_num = meta(family_rarefied)$visit_num,
+                      age = meta(family_rarefied)$age,
+                      Observed = d_alpha$observed,
+                      Shannon = d_alpha$diversity_shannon,
+                      check.names = FALSE)
+```
+
+### 1.11 NC: Visit 1 vs. Visit 2
+
+```{r}
+df_fig = df_alpha %>% 
+  filter(status == "nc")
+df_fig_long = df_fig %>% 
+  gather(key = "measure", value = "value", Observed:Shannon)
+df_fig_long$measure = factor(df_fig_long$measure, 
+                             levels = c("Observed", "Shannon"))
+df_p = df_fig_long %>% group_by(measure) %>%
+  do(fit = anova_test(data = ., formula = value ~ visit + age)) %>%
+  summarise(p = fit$p[1])
+df_ann = df_fig_long %>% group_by(measure) %>%
+  summarise(x = 1.5, y = 1.01 * max(value, na.rm = TRUE),
+            y_max = 1.1 * max(value, na.rm = TRUE),
+            visit = "v1") %>%
+  mutate(p = df_p$p, label = paste0("p = ", signif(p, 2)))
+p = ggplot(data = df_fig_long, aes(x = visit, y = value)) + 
+  geom_boxplot(aes(fill = visit)) +
+  geom_blank(data = df_ann, aes(y = y_max)) +
+  scale_fill_brewer(name = NULL, 
+                    labels = c("v1" = "Visit 1", "v2" = "Visit 2"),
+                    palette = "Accent") +
+  geom_point(alpha = 0.5, shape = 16, position = position_jitter(0.2), size = 0.8) +
+  facet_wrap(.~measure, scale = "free", nrow = 1) + 
+  geom_label(data = df_ann, aes(x = x, y = y, label = label), 
+             size = 4, vjust = -0.5, hjust = 0, color = "black") + 
+  labs(x = NULL, y = NULL, title = "NC: Visit 1 vs. Visit 2") + 
+  theme_bw() + 
+  theme(strip.background = element_rect(fill = "white"), 
+        legend.position = "bottom",
+        axis.text.x = element_blank(),
+        plot.title = element_text(hjust = 0.5))
+p

@@ -1,0 +1,130 @@
+dominance <- function(x, index="all", rank=1, relative=TRUE, aggregate=TRUE) {
+
+    # Only include accepted indices
+    if (!is.null(index)) {index <- tolower(index)}
+    
+    accepted <- tolower(c("DBP", "DMN", "absolute", "relative",
+        "simpson", "core_abundance", "gini"))
+
+    # Return all indices
+    if (length(index) == 1 && index == "all") {
+        index <- accepted
+    }
+
+    if (!is.null(index) && !any(index %in% accepted)) {
+        return(NULL)
+    }
+
+    if (!is.null(index)) {
+        index <- intersect(index, accepted)
+    }
+
+    tab <- NULL
+    if (!is.null(index)) {
+        for (idx in index) {
+            tab <- cbind(tab,
+            dominance_help(x, index=idx, rank=rank,
+                relative=relative, 
+                aggregate=aggregate))
+    }
+    } else {
+            tab <- cbind(tab,
+            dominance_help(x, index=NULL, rank=rank,
+                relative=relative, 
+                aggregate=aggregate))
+    }
+    colnames(tab) <- index
+    tab <- as.data.frame(tab)
+    
+    tab
+
+}
+
+
+
+dominance_help <- function(x, index="all", rank=1, relative=TRUE,
+    aggregate=TRUE) {
+
+    otu <- abundances(x)
+
+    if (is.null(index)) {
+        rank <- rank
+    } else if (index == "absolute") {
+        relative <- FALSE  # Rank=1 by default but can be tuned
+    } else if (index %in% c("relative")) {
+        relative <- TRUE  # Rank=1 by default but can be tuned
+    } else if (index %in% c("dbp")) {
+        # Berger-Parker
+        rank <- 1
+        relative <- TRUE
+    } else if (index %in% c("dmn")) {
+        # McNaughton's dominance
+        rank <- 2
+        relative <- TRUE
+        aggregate <- TRUE
+    } else if (index %in% c("simpson")) {
+        tmp <- apply(otu, 2, function(x) {
+            simpson_dominance(x)})
+        return(tmp)
+    } else if (index %in% c("core_abundance")) {
+        return(core_abundance(otu, detection=0.2/100, prevalence=50/100))
+    } else if (index == "gini") {
+        return(inequality(otu))
+    }
+
+    if (rank == 1 && relative) {
+        index <- "dbp"
+    } else if (rank == 2 && relative && aggregate) {
+        index <- "dmn"
+    }
+
+    if (relative) {
+        otu <- apply(otu, 2, function(x) {
+            x/sum(x, na.rm=TRUE)
+        })
+    }
+    
+    if (!aggregate) {
+        do <- apply(otu, 2, function(x) {
+            rev(sort(x))[[rank]]
+        })
+    } else {
+        do <- apply(otu, 2, function(x) {
+            sum(rev(sort(x))[seq_len(rank)])
+        })
+    }
+    
+    names(do) <- colnames(otu)
+
+    if (is.vector(do)) {
+        do <- as.matrix(do, ncol=1)
+        colnames(do) <- index        
+    }
+
+    do
+    
+}
+
+
+
+
+# x: Species count vector
+simpson_dominance <- function(x, zeroes=TRUE) {
+    
+    if (!zeroes) {
+        x[x > 0]
+    }
+    
+    # Relative abundances
+    p <- x/sum(x)
+    
+    # Simpson index (has interpretation as dominance)
+    lambda <- sum(p^2)
+    
+    # More advanced Simpson dominance (Simpson 1949) However let us not use
+    # this as it is not in [0,1] and it is very highly correlated with the
+    # simpler variant lambda Species richness (number of species)
+    # S <- length(x) sum(p * (p - 1)) / (S * (S - 1))
+
+    lambda
+    
